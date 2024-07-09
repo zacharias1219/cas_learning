@@ -7,18 +7,11 @@ from datetime import datetime, timedelta
 from fuzzywuzzy import fuzz
 from dotenv import load_dotenv
 from audio_recorder_streamlit import audio_recorder
-from pymongo import MongoClient
 from utils import speech_to_text, text_to_speech, get_answer, autoplay_audio
 import difflib
 
 # Load environment variables
 load_dotenv()
-
-# MongoDB setup
-MONGO_URI = os.getenv("MONGO_URI")
-client = MongoClient(MONGO_URI)
-db = client['your_database_name']  # Replace with your database name
-responses_collection = db['responses']
 
 # Load the question data from JSON files
 def load_json(file_path):
@@ -65,14 +58,6 @@ def handle_audio_response(prompt, correct_answer, key, check_partial=False, type
         transcription = speech_to_text(audio_file_path)
         normalized_transcription = normalize_text(transcription)
 
-        # Save response to MongoDB
-        response_record = {
-            "prompt": prompt,
-            "response": transcription,
-            "timestamp": datetime.now()
-        }
-        responses_collection.insert_one(response_record)
-
         if isinstance(correct_answer, list):
             normalized_correct_answers = [normalize_text(answer) for answer in correct_answer]
         else:
@@ -118,14 +103,6 @@ def handle_text_response(prompt, correct_answer, key, check_partial=False, type_
     user_response = st.text_input("Your answer", key=key)
     if st.button("Submit", key=f"submit_{key}"):
         normalized_user_response = normalize_text(user_response)
-
-        # Save response to MongoDB
-        response_record = {
-            "prompt": prompt,
-            "response": user_response,
-            "timestamp": datetime.now()
-        }
-        responses_collection.insert_one(response_record)
 
         if isinstance(correct_answer, list):
             normalized_correct_answers = [normalize_text(answer) for answer in correct_answer]
@@ -329,6 +306,10 @@ def picture_quiz_template(data, question_number):
 def picture_description_template(data, question_number):
     st.write(f"Question {question_number}: Picture Description")
     st.image(data['image_url'])
+    for i, question in enumerate(data['questions']):
+        st.markdown(f'{question["question"]}', unsafe_allow_html=True)
+        audio_response_path = text_to_speech(question["question"])
+        autoplay_audio(audio_response_path)
     
     # First audio response
     audio_data_1 = audio_recorder(f"Record your response:", key=f"picture_desc_audio_1_{question_number}", pause_threshold=2.5, icon_size="2x")
